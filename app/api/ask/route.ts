@@ -59,6 +59,19 @@ export async function POST(request: NextRequest) {
     // 2. OpenAI API 호출 (타임아웃 설정 포함)
     let aiOutput: string;
     try {
+      // API 키 확인
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey || apiKey === 'placeholder-key') {
+        console.error('OpenAI API 키가 설정되지 않았습니다.');
+        throw new Error('OPENAI_API_KEY_NOT_SET');
+      }
+
+      console.log('OpenAI API 호출 시작:', {
+        model: 'gpt-4o-mini',
+        hasApiKey: !!apiKey,
+        apiKeyPrefix: apiKey.substring(0, 7) + '...',
+      });
+
       const completion = await Promise.race([
         openai.chat.completions.create({
           model: 'gpt-4o-mini', // 비용 효율적인 모델 사용
@@ -80,7 +93,14 @@ export async function POST(request: NextRequest) {
         ),
       ]) as any;
 
+      console.log('OpenAI API 응답 받음:', {
+        hasChoices: !!completion?.choices,
+        choicesLength: completion?.choices?.length,
+        hasContent: !!completion?.choices?.[0]?.message?.content,
+      });
+
       if (!completion.choices || !completion.choices[0]?.message?.content) {
+        console.error('AI 응답이 비어있습니다:', completion);
         throw new Error('AI 응답이 비어있습니다.');
       }
 
@@ -139,15 +159,30 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 인증 오류 (API 키 문제)
-      if (errorStatus === 401 || errorMessage.includes('authentication') || errorMessage.includes('API key')) {
-        console.error('OpenAI API 인증 오류 - API 키를 확인하세요.');
+      // API 키 미설정 오류
+      if (openaiError.message === 'OPENAI_API_KEY_NOT_SET') {
+        console.error('OpenAI API 키가 설정되지 않았습니다.');
         return NextResponse.json<AskResponse>(
           {
             success: false,
             error: 'AI 서비스 설정에 문제가 있습니다. 관리자에게 문의하세요.',
           },
           { status: 500 }
+        );
+      }
+
+      // 인증 오류 (API 키 문제)
+      if (errorStatus === 401 || errorMessage.includes('authentication') || errorMessage.includes('API key') || errorMessage.includes('Invalid API key')) {
+        console.error('OpenAI API 인증 오류 - API 키를 확인하세요:', {
+          status: errorStatus,
+          message: errorMessage,
+        });
+        return NextResponse.json<AskResponse>(
+          {
+            success: false,
+            error: 'AI 서비스 인증에 실패했습니다. API 키를 확인해주세요.',
+          },
+          { status: 401 }
         );
       }
 
