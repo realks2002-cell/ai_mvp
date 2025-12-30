@@ -6,6 +6,8 @@ const apiKey = process.env.OPENAI_API_KEY || '';
 // 빈 문자열로 초기화하여 빌드 시점 오류 방지
 export const openai = new OpenAI({
   apiKey: apiKey || 'placeholder-key',
+  timeout: 25000, // 25초 타임아웃
+  maxRetries: 2, // 최대 2번 재시도
 });
 
 // 환경 변수 검증 함수 (런타임에만 호출)

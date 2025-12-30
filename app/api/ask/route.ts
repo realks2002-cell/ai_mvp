@@ -90,26 +90,22 @@ export async function POST(request: NextRequest) {
         userInputLength: userInput.trim().length,
       });
 
-      const completion = await Promise.race([
-        openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: userInput.trim(),
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-        }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('TIMEOUT')), 25000) // 25초 타임아웃
-        ),
-      ]) as any;
+      // OpenAI API 호출 (타임아웃은 SDK에서 처리)
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userInput.trim(),
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
 
       console.log('✅ OpenAI Chat Completions API 응답 받음:', {
         hasChoices: !!completion?.choices,
