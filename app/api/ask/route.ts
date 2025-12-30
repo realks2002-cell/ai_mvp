@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, validateSupabaseConfig } from '@/lib/supabase';
-import { openai, validateOpenAIConfig } from '@/lib/openai';
+import { validateOpenAIConfig } from '@/lib/openai';
 import { AskRequest, AskResponse } from '@/lib/types';
 
 // Node.js Runtime 명시적 설정 (Edge Runtime 문제 방지)
@@ -90,55 +90,47 @@ export async function POST(request: NextRequest) {
         apiKeyLength: apiKey?.length || 0,
       });
 
-      // 🔍 OpenAI 클라이언트 확인
-      console.log('🔍 OpenAI 클라이언트 확인:', {
-        hasOpenAIClient: !!openai,
-        hasChatCompletions: !!openai.chat,
-        hasChatCompletionsCreate: typeof openai.chat?.completions?.create === 'function',
-        openaiConstructor: openai?.constructor?.name,
-      });
-
-      // OpenAI Chat Completions API 호출 (표준 방식)
-      console.log('🚀 OpenAI Chat Completions API 호출 시작:', {
+      const openAiEndpoint = 'https://api.openai.com/v1/chat/completions';
+      const payload = {
         model: 'gpt-4o-mini',
-        systemPromptLength: systemPrompt.length,
-        userInputLength: userInput.trim().length,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userInput.trim() },
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      };
+
+      console.log('📡 OpenAI HTTP 요청 전송:', {
+        endpoint: openAiEndpoint,
+        payloadPreview: JSON.stringify(payload).substring(0, 200),
         timestamp: new Date().toISOString(),
       });
 
-      // OpenAI API 호출 (타임아웃은 SDK에서 처리)
-      let completion;
-      try {
-        console.log('📡 OpenAI API 요청 전송 중...');
-        completion = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: userInput.trim(),
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-        });
-        console.log('✅ OpenAI API 요청 성공');
-      } catch (apiCallError: any) {
-        console.error('❌ OpenAI API 호출 중 즉시 에러:', {
-          message: apiCallError?.message,
-          name: apiCallError?.name,
-          code: apiCallError?.code,
-          status: apiCallError?.status,
-          type: apiCallError?.constructor?.name,
-          stack: apiCallError?.stack?.substring(0, 500),
-        });
-        throw apiCallError; // 상위 catch로 전달
+      const completionResponse = await fetch(openAiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('📥 OpenAI HTTP 응답 수신:', {
+        status: completionResponse.status,
+        statusText: completionResponse.statusText,
+        ok: completionResponse.ok,
+      });
+
+      if (!completionResponse.ok) {
+        const errorBody = await completionResponse.text();
+        console.error('❌ OpenAI HTTP 오류 응답:', errorBody);
+        throw new Error(`OPENAI_HTTP_ERROR_${completionResponse.status}`);
       }
 
-      console.log('✅ OpenAI Chat Completions API 응답 받음:', {
+      const completion = await completionResponse.json();
+
+      console.log('✅ OpenAI Chat Completions API 응답 파싱 완료:', {
         hasChoices: !!completion?.choices,
         choicesLength: completion?.choices?.length,
         hasMessage: !!completion?.choices?.[0]?.message,
