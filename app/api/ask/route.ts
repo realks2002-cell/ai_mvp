@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
         hasOpenAIClient: !!openai,
         hasChatCompletions: !!openai.chat,
         hasChatCompletionsCreate: typeof openai.chat?.completions?.create === 'function',
+        openaiConstructor: openai?.constructor?.name,
       });
 
       // OpenAI Chat Completions API 호출 (표준 방식)
@@ -102,24 +103,40 @@ export async function POST(request: NextRequest) {
         model: 'gpt-4o-mini',
         systemPromptLength: systemPrompt.length,
         userInputLength: userInput.trim().length,
+        timestamp: new Date().toISOString(),
       });
 
       // OpenAI API 호출 (타임아웃은 SDK에서 처리)
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userInput.trim(),
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      });
+      let completion;
+      try {
+        console.log('📡 OpenAI API 요청 전송 중...');
+        completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: userInput.trim(),
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+        });
+        console.log('✅ OpenAI API 요청 성공');
+      } catch (apiCallError: any) {
+        console.error('❌ OpenAI API 호출 중 즉시 에러:', {
+          message: apiCallError?.message,
+          name: apiCallError?.name,
+          code: apiCallError?.code,
+          status: apiCallError?.status,
+          type: apiCallError?.constructor?.name,
+          stack: apiCallError?.stack?.substring(0, 500),
+        });
+        throw apiCallError; // 상위 catch로 전달
+      }
 
       console.log('✅ OpenAI Chat Completions API 응답 받음:', {
         hasChoices: !!completion?.choices,
