@@ -6,8 +6,22 @@ import { AskRequest, AskResponse } from '@/lib/types';
 // Node.js Runtime 명시적 설정 (Edge Runtime 문제 방지)
 export const runtime = 'nodejs';
 
+// Vercel Functions 타임아웃 설정 (최대 60초)
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
+    // 🔍 환경 변수 런타임 확인 (Vercel 디버깅용)
+    console.log('🔍 런타임 환경 변수 확인:', {
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+      supabaseUrlPrefix: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 20) || 'UNDEFINED',
+      openAIKeyPrefix: process.env.OPENAI_API_KEY?.substring(0, 7) || 'UNDEFINED',
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV,
+    });
+
     // 환경 변수 검증 (런타임에만 실행)
     validateSupabaseConfig();
     validateOpenAIConfig();
