@@ -82,17 +82,17 @@ export async function POST(request: NextRequest) {
 
       // OpenAI Responses API 호출 (새로운 방식)
       // System Prompt와 User Input을 결합
-      const combinedInput = `${systemPrompt}\n\n사용자: ${userInput.trim()}\n\n응답:`;
+      const prompt = `${systemPrompt}\n\n사용자: ${userInput.trim()}\n\n응답:`;
       
       console.log('🚀 OpenAI Responses API 호출 시작:', {
-        model: 'gpt-4o-mini',
-        inputLength: combinedInput.length,
+        model: 'gpt-4.1-mini',
+        inputLength: prompt.length,
       });
 
-      const response = await Promise.race([
+      const res = await Promise.race([
         openai.responses.create({
-          model: 'gpt-4o-mini',
-          input: combinedInput,
+          model: 'gpt-4.1-mini',
+          input: prompt,
         }),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('TIMEOUT')), 25000) // 25초 타임아웃
@@ -100,17 +100,17 @@ export async function POST(request: NextRequest) {
       ]) as any;
 
       console.log('✅ OpenAI Responses API 응답 받음:', {
-        hasOutputText: !!response?.output_text,
-        outputTextLength: response?.output_text?.length,
-        fullResponse: JSON.stringify(response).substring(0, 200),
+        hasOutputText: !!res?.output_text,
+        outputTextLength: res?.output_text?.length,
+        fullResponse: JSON.stringify(res).substring(0, 200),
       });
 
-      if (!response?.output_text) {
-        console.error('❌ AI 응답이 비어있습니다:', JSON.stringify(response, null, 2));
+      if (!res?.output_text) {
+        console.error('❌ AI 응답이 비어있습니다:', JSON.stringify(res, null, 2));
         throw new Error('AI 응답이 비어있습니다.');
       }
 
-      aiOutput = response.output_text;
+      aiOutput = res.output_text;
     } catch (openaiError: any) {
       // 🔥 진짜 에러 노출 (디버깅 모드)
       const errorStatus = openaiError?.status || openaiError?.response?.status;
