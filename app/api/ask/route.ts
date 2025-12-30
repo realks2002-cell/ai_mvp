@@ -3,6 +3,9 @@ import { supabase, validateSupabaseConfig } from '@/lib/supabase';
 import { openai, validateOpenAIConfig } from '@/lib/openai';
 import { AskRequest, AskResponse } from '@/lib/types';
 
+// Node.js Runtime 명시적 설정 (Edge Runtime 문제 방지)
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
     // 환경 변수 검증 (런타임에만 실행)
