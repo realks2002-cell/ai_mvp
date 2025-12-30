@@ -86,7 +86,15 @@ export async function POST(request: NextRequest) {
 
       aiOutput = completion.choices[0].message.content;
     } catch (openaiError: any) {
-      console.error('OpenAI API 호출 실패:', openaiError);
+      // 상세한 에러 로깅
+      console.error('OpenAI API 호출 실패:', {
+        message: openaiError?.message,
+        status: openaiError?.status,
+        code: openaiError?.code,
+        response: openaiError?.response,
+        stack: openaiError?.stack,
+        fullError: openaiError,
+      });
 
       // 타임아웃 에러 처리
       if (openaiError.message === 'TIMEOUT' || openaiError.code === 'ETIMEDOUT') {
