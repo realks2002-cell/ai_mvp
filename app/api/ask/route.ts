@@ -72,40 +72,38 @@ export async function POST(request: NextRequest) {
         apiKeyPrefix: apiKey.substring(0, 7) + '...',
       });
 
-      // OpenAI API 호출 (타임아웃을 Vercel Functions 제한에 맞춤)
-      const completion = await Promise.race([
-        openai.chat.completions.create({
-          model: 'gpt-4o-mini', // gpt-4o-mini 모델 사용 (비용 효율적)
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: userInput.trim(),
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
+      // OpenAI Responses API 호출 (새로운 방식)
+      // System Prompt와 User Input을 결합
+      const combinedInput = `${systemPrompt}\n\n사용자: ${userInput.trim()}\n\n응답:`;
+      
+      console.log('OpenAI Responses API 호출 시작:', {
+        model: 'gpt-4o-mini',
+        hasApiKey: !!apiKey,
+        apiKeyPrefix: apiKey.substring(0, 7) + '...',
+        inputLength: combinedInput.length,
+      });
+
+      const response = await Promise.race([
+        openai.responses.create({
+          model: 'gpt-4o-mini',
+          input: combinedInput,
         }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('TIMEOUT')), 25000) // 25초 타임아웃 (Vercel 기본 10초, 최대 60초)
+          setTimeout(() => reject(new Error('TIMEOUT')), 25000) // 25초 타임아웃
         ),
       ]) as any;
 
-      console.log('OpenAI API 응답 받음:', {
-        hasChoices: !!completion?.choices,
-        choicesLength: completion?.choices?.length,
-        hasContent: !!completion?.choices?.[0]?.message?.content,
+      console.log('OpenAI Responses API 응답 받음:', {
+        hasOutputText: !!response?.output_text,
+        outputTextLength: response?.output_text?.length,
       });
 
-      if (!completion.choices || !completion.choices[0]?.message?.content) {
-        console.error('AI 응답이 비어있습니다:', completion);
+      if (!response?.output_text) {
+        console.error('AI 응답이 비어있습니다:', response);
         throw new Error('AI 응답이 비어있습니다.');
       }
 
-      aiOutput = completion.choices[0].message.content;
+      aiOutput = response.output_text;
     } catch (openaiError: any) {
       // 상세한 에러 로깅
       const errorDetails = {
@@ -216,7 +214,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 알 수 없는 에러 - 더 상세한 정보 반환 (개발용)
-      const errorDetails = {
+      const unknownErrorDetails = {
         message: errorMessage,
         status: errorStatus,
         code: errorCode,
@@ -224,7 +222,7 @@ export async function POST(request: NextRequest) {
         hasResponse: !!openaiError?.response,
       };
       
-      console.error('알 수 없는 OpenAI API 오류:', errorDetails);
+      console.error('알 수 없는 OpenAI API 오류:', unknownErrorDetails);
       
       // 개발 환경에서는 상세 오류 반환
       const isDevelopment = process.env.NODE_ENV === 'development';
