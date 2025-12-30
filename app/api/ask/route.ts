@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         apiKeyPrefix: apiKey.substring(0, 7) + '...',
       });
 
+      // OpenAI API 호출 (타임아웃을 Vercel Functions 제한에 맞춤)
       const completion = await Promise.race([
         openai.chat.completions.create({
           model: 'gpt-4o-mini', // gpt-4o-mini 모델 사용 (비용 효율적)
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
           max_tokens: 1000,
         }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('TIMEOUT')), 30000) // 30초 타임아웃
+          setTimeout(() => reject(new Error('TIMEOUT')), 25000) // 25초 타임아웃 (Vercel 기본 10초, 최대 60초)
         ),
       ]) as any;
 
@@ -107,14 +108,20 @@ export async function POST(request: NextRequest) {
       aiOutput = completion.choices[0].message.content;
     } catch (openaiError: any) {
       // 상세한 에러 로깅
-      console.error('OpenAI API 호출 실패:', {
+      const errorDetails = {
         message: openaiError?.message,
         status: openaiError?.status,
         code: openaiError?.code,
-        response: openaiError?.response,
-        stack: openaiError?.stack,
-        fullError: openaiError,
-      });
+        type: openaiError?.constructor?.name,
+        name: openaiError?.name,
+        response: openaiError?.response ? {
+          status: openaiError.response.status,
+          statusText: openaiError.response.statusText,
+        } : null,
+        stack: openaiError?.stack?.substring(0, 500), // 스택 추적 일부만
+      };
+      
+      console.error('OpenAI API 호출 실패:', JSON.stringify(errorDetails, null, 2));
 
       // 타임아웃 에러 처리
       if (openaiError.message === 'TIMEOUT' || openaiError.code === 'ETIMEDOUT') {
