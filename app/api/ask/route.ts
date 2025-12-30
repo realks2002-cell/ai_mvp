@@ -67,14 +67,14 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('OpenAI API 호출 시작:', {
-        model: 'gpt-4o-mini',
+        model: 'gpt-3.5-turbo',
         hasApiKey: !!apiKey,
         apiKeyPrefix: apiKey.substring(0, 7) + '...',
       });
 
       const completion = await Promise.race([
         openai.chat.completions.create({
-          model: 'gpt-4o-mini', // 비용 효율적인 모델 사용
+          model: 'gpt-3.5-turbo', // gpt-4o-mini 대신 gpt-3.5-turbo 사용
           messages: [
             {
               role: 'system',
