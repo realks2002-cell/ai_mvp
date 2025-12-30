@@ -66,20 +66,26 @@ export async function POST(request: NextRequest) {
         throw new Error('OPENAI_API_KEY_NOT_SET');
       }
 
-      console.log('OpenAI API 호출 시작:', {
-        model: 'gpt-4o-mini',
+      // 🔍 환경 변수 확인
+      console.log('🔍 환경 변수 확인:', {
         hasApiKey: !!apiKey,
-        apiKeyPrefix: apiKey.substring(0, 7) + '...',
+        apiKeyPrefix: apiKey ? apiKey.substring(0, 7) + '...' : 'UNDEFINED',
+        apiKeyLength: apiKey?.length || 0,
+      });
+
+      // 🔍 OpenAI 클라이언트 확인
+      console.log('🔍 OpenAI 클라이언트 확인:', {
+        hasOpenAIClient: !!openai,
+        hasResponses: !!openai.responses,
+        hasResponsesCreate: typeof openai.responses?.create === 'function',
       });
 
       // OpenAI Responses API 호출 (새로운 방식)
       // System Prompt와 User Input을 결합
       const combinedInput = `${systemPrompt}\n\n사용자: ${userInput.trim()}\n\n응답:`;
       
-      console.log('OpenAI Responses API 호출 시작:', {
+      console.log('🚀 OpenAI Responses API 호출 시작:', {
         model: 'gpt-4o-mini',
-        hasApiKey: !!apiKey,
-        apiKeyPrefix: apiKey.substring(0, 7) + '...',
         inputLength: combinedInput.length,
       });
 
@@ -93,20 +99,21 @@ export async function POST(request: NextRequest) {
         ),
       ]) as any;
 
-      console.log('OpenAI Responses API 응답 받음:', {
+      console.log('✅ OpenAI Responses API 응답 받음:', {
         hasOutputText: !!response?.output_text,
         outputTextLength: response?.output_text?.length,
+        fullResponse: JSON.stringify(response).substring(0, 200),
       });
 
       if (!response?.output_text) {
-        console.error('AI 응답이 비어있습니다:', response);
+        console.error('❌ AI 응답이 비어있습니다:', JSON.stringify(response, null, 2));
         throw new Error('AI 응답이 비어있습니다.');
       }
 
       aiOutput = response.output_text;
     } catch (openaiError: any) {
-      // 상세한 에러 로깅
-      const errorDetails = {
+      // 🔥 진짜 에러 노출 (디버깅 모드)
+      console.error('❌ OpenAI API 호출 실패 - 전체 에러:', {
         message: openaiError?.message,
         status: openaiError?.status,
         code: openaiError?.code,
@@ -115,11 +122,16 @@ export async function POST(request: NextRequest) {
         response: openaiError?.response ? {
           status: openaiError.response.status,
           statusText: openaiError.response.statusText,
+          data: openaiError.response.data,
         } : null,
-        stack: openaiError?.stack?.substring(0, 500), // 스택 추적 일부만
-      };
+        stack: openaiError?.stack,
+        fullError: openaiError,
+      });
       
-      console.error('OpenAI API 호출 실패:', JSON.stringify(errorDetails, null, 2));
+      // 프론트엔드에 진짜 에러 메시지 반환 (디버깅용)
+      const errorMessage = openaiError?.message || openaiError?.toString() || '알 수 없는 오류';
+      const errorStatus = openaiError?.status || openaiError?.response?.status;
+      const errorCode = openaiError?.code;
 
       // 타임아웃 에러 처리
       if (openaiError.message === 'TIMEOUT' || openaiError.code === 'ETIMEDOUT') {
@@ -213,26 +225,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 알 수 없는 에러 - 더 상세한 정보 반환 (개발용)
-      const unknownErrorDetails = {
-        message: errorMessage,
-        status: errorStatus,
-        code: errorCode,
-        type: openaiError?.constructor?.name,
-        hasResponse: !!openaiError?.response,
-      };
-      
-      console.error('알 수 없는 OpenAI API 오류:', unknownErrorDetails);
-      
-      // 개발 환경에서는 상세 오류 반환
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      
+      // 알 수 없는 에러 - 진짜 에러 메시지 반환 (디버깅용)
       return NextResponse.json<AskResponse>(
         {
           success: false,
-          error: isDevelopment 
-            ? `AI 응답 생성 중 문제가 발생했습니다: ${errorMessage || '알 수 없는 오류'} (Status: ${errorStatus || 'N/A'}, Code: ${errorCode || 'N/A'})`
-            : 'AI 응답 생성 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
+          error: `[디버깅] ${errorMessage} (Status: ${errorStatus || 'N/A'}, Code: ${errorCode || 'N/A'})`,
         },
         { status: 500 }
       );
@@ -265,11 +262,16 @@ export async function POST(request: NextRequest) {
       message: aiOutput,
     });
   } catch (error: any) {
-    console.error('API 처리 중 예상치 못한 오류:', error);
+    // 🔥 최상위 catch - 진짜 에러 노출
+    console.error('❌ API 처리 중 예상치 못한 오류:', {
+      message: error?.message,
+      stack: error?.stack,
+      fullError: error,
+    });
     return NextResponse.json<AskResponse>(
       {
         success: false,
-        error: `서버 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
+        error: `[디버깅] 서버 오류: ${error?.message || error?.toString() || '알 수 없는 오류'}`,
       },
       { status: 500 }
     );
