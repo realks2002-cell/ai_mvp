@@ -208,11 +208,26 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 알 수 없는 에러
+      // 알 수 없는 에러 - 더 상세한 정보 반환 (개발용)
+      const errorDetails = {
+        message: errorMessage,
+        status: errorStatus,
+        code: errorCode,
+        type: openaiError?.constructor?.name,
+        hasResponse: !!openaiError?.response,
+      };
+      
+      console.error('알 수 없는 OpenAI API 오류:', errorDetails);
+      
+      // 개발 환경에서는 상세 오류 반환
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      
       return NextResponse.json<AskResponse>(
         {
           success: false,
-          error: 'AI 응답 생성 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
+          error: isDevelopment 
+            ? `AI 응답 생성 중 문제가 발생했습니다: ${errorMessage || '알 수 없는 오류'} (Status: ${errorStatus || 'N/A'}, Code: ${errorCode || 'N/A'})`
+            : 'AI 응답 생성 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
         },
         { status: 500 }
       );
