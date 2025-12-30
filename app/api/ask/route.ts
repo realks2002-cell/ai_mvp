@@ -76,41 +76,52 @@ export async function POST(request: NextRequest) {
       // 🔍 OpenAI 클라이언트 확인
       console.log('🔍 OpenAI 클라이언트 확인:', {
         hasOpenAIClient: !!openai,
-        hasResponses: !!openai.responses,
-        hasResponsesCreate: typeof openai.responses?.create === 'function',
+        hasChatCompletions: !!openai.chat,
+        hasChatCompletionsCreate: typeof openai.chat?.completions?.create === 'function',
       });
 
-      // OpenAI Responses API 호출 (새로운 방식)
-      // System Prompt와 User Input을 결합
-      const prompt = `${systemPrompt}\n\n사용자: ${userInput.trim()}\n\n응답:`;
-      
-      console.log('🚀 OpenAI Responses API 호출 시작:', {
-        model: 'gpt-4.1-mini',
-        inputLength: prompt.length,
+      // OpenAI Chat Completions API 호출 (표준 방식)
+      console.log('🚀 OpenAI Chat Completions API 호출 시작:', {
+        model: 'gpt-4o-mini',
+        systemPromptLength: systemPrompt.length,
+        userInputLength: userInput.trim().length,
       });
 
-      const res = await Promise.race([
-        openai.responses.create({
-          model: 'gpt-4.1-mini',
-          input: prompt,
+      const completion = await Promise.race([
+        openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: userInput.trim(),
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
         }),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('TIMEOUT')), 25000) // 25초 타임아웃
         ),
       ]) as any;
 
-      console.log('✅ OpenAI Responses API 응답 받음:', {
-        hasOutputText: !!res?.output_text,
-        outputTextLength: res?.output_text?.length,
-        fullResponse: JSON.stringify(res).substring(0, 200),
+      console.log('✅ OpenAI Chat Completions API 응답 받음:', {
+        hasChoices: !!completion?.choices,
+        choicesLength: completion?.choices?.length,
+        hasMessage: !!completion?.choices?.[0]?.message,
+        hasContent: !!completion?.choices?.[0]?.message?.content,
+        contentLength: completion?.choices?.[0]?.message?.content?.length,
       });
 
-      if (!res?.output_text) {
-        console.error('❌ AI 응답이 비어있습니다:', JSON.stringify(res, null, 2));
+      if (!completion?.choices?.[0]?.message?.content) {
+        console.error('❌ AI 응답이 비어있습니다:', JSON.stringify(completion, null, 2));
         throw new Error('AI 응답이 비어있습니다.');
       }
 
-      aiOutput = res.output_text;
+      aiOutput = completion.choices[0].message.content;
     } catch (openaiError: any) {
       // 🔥 진짜 에러 노출 (디버깅 모드)
       const errorStatus = openaiError?.status || openaiError?.response?.status;
