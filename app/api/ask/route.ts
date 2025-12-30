@@ -128,20 +128,33 @@ export async function POST(request: NextRequest) {
       const errorCode = openaiError?.code;
       const errorMessage = openaiError?.message || openaiError?.toString() || '알 수 없는 오류';
       
-      console.error('❌ OpenAI API 호출 실패 - 전체 에러:', {
+      // 더 상세한 에러 정보 수집
+      const errorDetails: any = {
         message: errorMessage,
         status: errorStatus,
         code: errorCode,
         type: openaiError?.constructor?.name,
         name: openaiError?.name,
-        response: openaiError?.response ? {
+      };
+      
+      // 응답이 있으면 상세 정보 추가
+      if (openaiError?.response) {
+        errorDetails.response = {
           status: openaiError.response.status,
           statusText: openaiError.response.statusText,
           data: openaiError.response.data,
-        } : null,
-        stack: openaiError?.stack,
-        fullError: openaiError,
-      });
+        };
+      }
+      
+      // 에러 객체의 모든 속성 확인
+      if (openaiError) {
+        errorDetails.allProperties = Object.keys(openaiError);
+        errorDetails.errorString = String(openaiError);
+        errorDetails.stack = openaiError?.stack;
+      }
+      
+      console.error('❌ OpenAI API 호출 실패 - 전체 에러:', JSON.stringify(errorDetails, null, 2));
+      console.error('❌ 스택 추적:', openaiError?.stack);
 
       // 타임아웃 에러 처리
       if (openaiError.message === 'TIMEOUT' || openaiError.code === 'ETIMEDOUT') {
@@ -268,20 +281,27 @@ export async function POST(request: NextRequest) {
       success: true,
       message: aiOutput,
     });
-  } catch (error: any) {
-    // 🔥 최상위 catch - 진짜 에러 노출
-    console.error('❌ API 처리 중 예상치 못한 오류:', {
-      message: error?.message,
-      stack: error?.stack,
-      fullError: error,
-    });
-    return NextResponse.json<AskResponse>(
-      {
-        success: false,
-        error: `[디버깅] 서버 오류: ${error?.message || error?.toString() || '알 수 없는 오류'}`,
-      },
-      { status: 500 }
-    );
-  }
+      } catch (error: any) {
+        // 🔥 최상위 catch - 진짜 에러 노출
+        const topLevelError = {
+          message: error?.message,
+          stack: error?.stack,
+          type: error?.constructor?.name,
+          name: error?.name,
+          allProperties: Object.keys(error || {}),
+          errorString: String(error),
+          fullError: error,
+        };
+        
+        console.error('❌ API 처리 중 예상치 못한 오류:', JSON.stringify(topLevelError, null, 2));
+        
+        return NextResponse.json<AskResponse>(
+          {
+            success: false,
+            error: `[디버깅] 서버 오류: ${error?.message || error?.toString() || '알 수 없는 오류'} (Type: ${error?.constructor?.name || 'Unknown'})`,
+          },
+          { status: 500 }
+        );
+      }
 }
 
