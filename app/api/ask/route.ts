@@ -113,10 +113,14 @@ export async function POST(request: NextRequest) {
       aiOutput = response.output_text;
     } catch (openaiError: any) {
       // 🔥 진짜 에러 노출 (디버깅 모드)
+      const errorStatus = openaiError?.status || openaiError?.response?.status;
+      const errorCode = openaiError?.code;
+      const errorMessage = openaiError?.message || openaiError?.toString() || '알 수 없는 오류';
+      
       console.error('❌ OpenAI API 호출 실패 - 전체 에러:', {
-        message: openaiError?.message,
-        status: openaiError?.status,
-        code: openaiError?.code,
+        message: errorMessage,
+        status: errorStatus,
+        code: errorCode,
         type: openaiError?.constructor?.name,
         name: openaiError?.name,
         response: openaiError?.response ? {
@@ -127,11 +131,6 @@ export async function POST(request: NextRequest) {
         stack: openaiError?.stack,
         fullError: openaiError,
       });
-      
-      // 프론트엔드에 진짜 에러 메시지 반환 (디버깅용)
-      const errorMessage = openaiError?.message || openaiError?.toString() || '알 수 없는 오류';
-      const errorStatus = openaiError?.status || openaiError?.response?.status;
-      const errorCode = openaiError?.code;
 
       // 타임아웃 에러 처리
       if (openaiError.message === 'TIMEOUT' || openaiError.code === 'ETIMEDOUT') {
@@ -144,10 +143,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // OpenAI API 에러 객체 확인
-      const errorStatus = openaiError?.status || openaiError?.response?.status;
-      const errorCode = openaiError?.code;
-      const errorMessage = openaiError?.message || '';
+      // OpenAI API 에러 객체 확인 (이미 위에서 정의됨 - 재정의 불필요)
 
       // 토큰 초과 에러 처리
       if (
